@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="app-version" content="__APP_VERSION__">
+<title>AquaGrid – Smart Water Distribution Dashboard</title>
+<style>
+  :root {
+    --bg: #0b1d2e; --panel: #11283d; --panel2: #16324b; --border: #1f4161;
+    --text: #e6f1fa; --muted: #8fb0c9; --accent: #2fa4e7;
+    --ok: #2ecc71; --warn: #f5b041; --crit: #e74c3c; --maint: #a569bd;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+         background: var(--bg); color: var(--text); }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+           padding: 16px 24px; background: linear-gradient(90deg, #0e3a5c, #0b1d2e); border-bottom: 1px solid var(--border); }
+  header h1 { margin: 0; font-size: 1.35rem; }
+  header h1 span { color: var(--accent); }
+  .meta { color: var(--muted); font-size: .85rem; }
+  .live { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--ok);
+          margin-right: 6px; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  main { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+  h2 { font-size: 1.05rem; margin: 26px 0 12px; color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card.Warning { border-left: 4px solid var(--warn); }
+  .card.Critical { border-left: 4px solid var(--crit); }
+  .card.Normal { border-left: 4px solid var(--ok); }
+  .card.Maintenance { border-left: 4px solid var(--maint); }
+  .card h3 { margin: 0 0 2px; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
+  .card .sub { color: var(--muted); font-size: .8rem; margin-bottom: 10px; }
+  .row { display: flex; justify-content: space-between; font-size: .88rem; padding: 4px 0; border-bottom: 1px dashed #1c3a55; }
+  .row:last-child { border-bottom: none; }
+  .row b.bad { color: var(--crit); }
+  .bar { height: 8px; background: #0a1826; border-radius: 4px; overflow: hidden; margin: 4px 0 6px; }
+  .bar > div { height: 100%; background: var(--accent); transition: width .6s; }
+  .bar > div.low { background: var(--crit); }
+  .badge { font-size: .72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+  .badge.Normal { background: rgba(46,204,113,.18); color: var(--ok); }
+  .badge.Warning, .badge.High, .badge.Medium { background: rgba(245,176,65,.18); color: var(--warn); }
+  .badge.Critical { background: rgba(231,76,60,.2); color: var(--crit); }
+  .badge.Maintenance, .badge.Low { background: rgba(165,105,189,.2); color: var(--maint); }
+  .badge.on { background: rgba(47,164,231,.2); color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 10px; overflow: hidden; font-size: .87rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  th { background: var(--panel2); color: var(--muted); font-weight: 600; }
+  .alerts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .alerts li { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;
+               display: flex; gap: 12px; align-items: center; font-size: .9rem; }
+  .alerts li.Critical { border-left: 4px solid var(--crit); }
+  .alerts li.High { border-left: 4px solid var(--warn); }
+  .empty { color: var(--muted); font-style: italic; }
+  .legend { color: var(--muted); font-size: .8rem; margin-top: -6px; margin-bottom: 10px; }
+  .banner { background: rgba(231,76,60,.15); border: 1px solid var(--crit); color: #ffb3aa; padding: 14px 18px; border-radius: 8px; margin-bottom: 14px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 6px; }
+  .toolbar label { color: var(--muted); font-size: .88rem; }
+  select { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: .9rem; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 14px; }
+  .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .kpi .label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  .kpi .value { font-size: 1.55rem; font-weight: 700; margin-top: 4px; }
+  .kpi .note { color: var(--muted); font-size: .8rem; }
+  .status-Open { color: var(--crit); font-weight: 600; }
+  .status-Crew-Dispatched { color: var(--warn); font-weight: 600; }
+  .status-Under-Repair { color: var(--accent); font-weight: 600; }
+  .status-Resolved { color: var(--ok); font-weight: 600; }
+  .two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+  .queue { counter-reset: q; }
+  .queue li::before { counter-increment: q; content: counter(q); font-weight: 700; color: var(--accent); min-width: 18px; }
+  footer { color: var(--muted); font-size: .78rem; text-align: center; padding: 22px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128167; Aqua<span>Grid</span> – Smart Water Distribution Dashboard</h1>
+  <div class="meta"><span class="live"></span>Live simulated telemetry · Last update: <span id="lastUpdate">--</span></div>
+</header>
+
+<main id="app">
+  <div id="feedBanner"></div>
+
+  <div class="toolbar">
+    <label for="zoneFilter">Filter by zone:</label>
+    <select id="zoneFilter"><option value="ALL">All zones</option></select>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="label">Total daily water supplied</div><div class="value" id="totalSupply">--</div><div class="note" id="totalSupplyNote"></div></div>
+    <div class="kpi"><div class="label">Est. total consumption</div><div class="value" id="totalConsumption">--</div><div class="note" id="nrwNote"></div></div>
+    <div class="kpi"><div class="label">Highest consumption zone</div><div class="value" id="topZone">--</div><div class="note" id="topZoneNote"></div></div>
+    <div class="kpi"><div class="label">Open leakage incidents</div><div class="value" id="openLeaks">--</div><div class="note" id="openLeaksNote"></div></div>
+  </div>
+
+  <h2>&#9888; Active Alerts <span class="meta">(sorted by priority)</span></h2>
+  <p class="legend">Alert rules: pipeline pressure outside <span id="pRange"></span> bar, or reservoir level below <span id="rMin"></span>%.</p>
+  <ul class="alerts" id="alertList"></ul>
+
+  <h2>&#127969; Distribution Zones</h2>
+  <div class="grid" id="zoneGrid"></div>
+
+  <div class="two-col">
+    <div>
+      <h2>&#128167; Leakage Incidents</h2>
+      <table id="leakTable">
+        <thead><tr><th>Incident</th><th>Zone</th><th>Location</th><th>Severity</th><th>Est. Loss (kL/day)</th><th>Detected</th><th>Maintenance Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div>
+      <h2>&#128295; Maintenance Priority Queue</h2>
+      <ul class="alerts queue" id="maintenanceQueue"></ul>
+    </div>
+  </div>
+
+  <h2>&#128336; Water Supply Schedule</h2>
+  <table id="scheduleTable">
+    <thead><tr><th>Zone</th><th>Area</th><th>Supply Timings</th><th>Current State</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</main>
+
+<footer>AquaGrid Water Network Monitor · Version <span id="appVersion">__APP_VERSION__</span> · City Water Authority</footer>
+
+<script>
+// ============================ CORE LOGIC (unit-tested) ============================
+// @core-start
+const THRESHOLDS = { PRESSURE_MIN: 2.0, PRESSURE_MAX: 4.5, RESERVOIR_MIN_PCT: 25 };
+const SEVERITY_RANK = { Critical: 3, High: 2, Medium: 1, Low: 0 };
+
+/** Evaluate one zone and return its network status + list of threshold violations. */
+function evaluateZone(z) {
+  const issues = [];
+  const { PRESSURE_MIN, PRESSURE_MAX, RESERVOIR_MIN_PCT } = THRESHOLDS;
+  if (z.pressure < PRESSURE_MIN) {
+    issues.push({ type: "LOW_PRESSURE", severity: z.pressure < PRESSURE_MIN - 0.5 ? "Critical" : "High",
+      message: `Low pipeline pressure ${z.pressure.toFixed(2)} bar (min ${PRESSURE_MIN} bar)` });
+  } else if (z.pressure > PRESSURE_MAX) {
+    issues.push({ type: "HIGH_PRESSURE", severity: z.pressure > PRESSURE_MAX + 0.5 ? "Critical" : "High",
+      message: `High pipeline pressure ${z.pressure.toFixed(2)} bar (max ${PRESSURE_MAX} bar) – burst risk` });
+  }
+  if (z.reservoir < RESERVOIR_MIN_PCT) {
+    issues.push({ type: "LOW_RESERVOIR", severity: z.reservoir < 15 ? "Critical" : "High",
+      message: `Reservoir level ${z.reservoir.toFixed(1)}% below ${RESERVOIR_MIN_PCT}% threshold` });
+  }
+  let status = "Normal";
+  if (issues.some(i => i.severity === "Critical")) status = "Critical";
+  else if (issues.length) status = "Warning";
+  else if (z.maintenance) status = "Maintenance";
+  return { status, issues };
+}
+
+/** Collect all zone alerts, highest priority first. */
+function buildAlerts(zones) {
+  return zones
+    .flatMap(z => evaluateZone(z).issues.map(i => ({ ...i, zoneId: z.id, zoneName: z.name })))
+    .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
+}
+
+/** Is a "HH:MM-HH:MM" supply window active at minutes-since-midnight `m`? */
+function inWindow(win, m) {
+  const [s, e] = win.split("-").map(t => { const [h, mi] = t.split(":").map(Number); return h * 60 + mi; });
+  return m >= s && m < e;
+}
+
+/** Supply state for a zone at a given time. */
+function supplyState(z, date) {
+  const m = date.getHours() * 60 + date.getMinutes();
+  if (z.schedule.some(w => inWindow(w, m))) return { on: true, label: "Supplying now" };
+  const starts = z.schedule.map(w => w.split("-")[0]).sort();
+  const next = starts.find(s => { const [h, mi] = s.split(":").map(Number); return h * 60 + mi > m; }) || starts[0];
+  return { on: false, label: `Next supply at ${next}` };
+}
+
+/** Zone-based filtering ("ALL" returns every item). Works for zones and for records with zoneId. */
+function filterByZone(items, zoneId) {
+  if (!zoneId || zoneId === "ALL") return items;
+  return items.filter(i => (i.zoneId || i.id) === zoneId);
+}
+
+/** Zone-wise water analytics. */
+function computeAnalytics(zones) {
+  const totalSupplyKL = zones.reduce((s, z) => s + z.supplyKL, 0);
+  const totalConsumptionKL = zones.reduce((s, z) => s + z.consumptionKL, 0);
+  const topZone = zones.reduce((top, z) => (!top || z.consumptionKL > top.consumptionKL ? z : top), null);
+  const nonRevenuePct = totalSupplyKL ? ((totalSupplyKL - totalConsumptionKL) / totalSupplyKL) * 100 : 0;
+  return { totalSupplyKL, totalConsumptionKL, topZone, nonRevenuePct };
+}
+
+/** Combine threshold alerts and unresolved leaks into one prioritised maintenance queue. */
+function prioritizeMaintenance(alerts, leaks) {
+  const leakItems = leaks
+    .filter(l => l.status !== "Resolved")
+    .map(l => ({ severity: l.severity, zoneId: l.zoneId, source: "Leak", lossKL: l.lossKL,
+                 message: `${l.id}: leak at ${l.location} (~${l.lossKL} kL/day) – ${l.status}` }));
+  const alertItems = alerts.map(a => ({ severity: a.severity, zoneId: a.zoneId, source: "Sensor", lossKL: 0, message: a.message }));
+  return [...leakItems, ...alertItems].sort((a, b) =>
+    SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || b.lossKL - a.lossKL);
+}
+// @core-end
+
+// ============================ SIMULATED WATER-NETWORK DATA ============================
+const zones = [
+  { id: "Z1", name: "Central Business District", reservoir: 72, capacityML: 18, supplyKL: 14200, consumptionKL: 13150, pressure: 3.4, basePressure: 3.4, schedule: ["05:00-09:00", "17:00-21:00"], maintenance: false },
+  { id: "Z2", name: "North Hills",               reservoir: 58, capacityML: 12, supplyKL: 9800,  consumptionKL: 9120,  pressure: 2.6, basePressure: 2.6, schedule: ["05:30-08:30", "18:00-20:30"], maintenance: false },
+  { id: "Z3", name: "Riverside",                 reservoir: 81, capacityML: 15, supplyKL: 11650, consumptionKL: 10480, pressure: 4.8, basePressure: 4.8, schedule: ["06:00-09:00", "16:30-19:30"], maintenance: false },
+  { id: "Z4", name: "Industrial Estate",         reservoir: 44, capacityML: 22, supplyKL: 17900, consumptionKL: 17320, pressure: 1.6, basePressure: 1.6, schedule: ["00:00-06:00", "14:00-22:00"], maintenance: false },
+  { id: "Z5", name: "East Suburbs",              reservoir: 21, capacityML: 10, supplyKL: 8350,  consumptionKL: 8010,  pressure: 2.9, basePressure: 2.9, schedule: ["05:00-08:00", "17:30-20:00"], maintenance: false },
+  { id: "Z6", name: "Old City",                  reservoir: 63, capacityML: 9,  supplyKL: 7400,  consumptionKL: 6890,  pressure: 3.1, basePressure: 3.1, schedule: ["06:00-10:00", "18:00-21:00"], maintenance: true  },
+];
+
+// Leakage incidents (acoustic loggers / night-flow analysis), detection times relative to now.
+const minsAgo = m => new Date(Date.now() - m * 60000);
+const leaks = [
+  { id: "LK-1042", zoneId: "Z4", location: "Trunk main, Gate 3 Rd",       severity: "Critical", lossKL: 420, detected: minsAgo(38),  status: "Crew Dispatched" },
+  { id: "LK-1041", zoneId: "Z3", location: "Riverside Ave valve chamber", severity: "High",     lossKL: 185, detected: minsAgo(95),  status: "Open" },
+  { id: "LK-1039", zoneId: "Z1", location: "MG Road service line",        severity: "Medium",   lossKL: 60,  detected: minsAgo(260), status: "Under Repair" },
+  { id: "LK-1037", zoneId: "Z5", location: "Sector 9 distribution main",  severity: "High",     lossKL: 140, detected: minsAgo(410), status: "Open" },
+  { id: "LK-1033", zoneId: "Z6", location: "Clock Tower junction",        severity: "Low",      lossKL: 18,  detected: minsAgo(900), status: "Resolved" },
+];
+const LEAK_SITES = { Z1: "Station Rd lateral", Z2: "Hilltop booster outlet", Z3: "Embankment pipeline", Z4: "Factory Lane feeder", Z5: "Lake View colony main", Z6: "Bazaar St connection" };
+let leakSeq = 1043;
+let selectedZone = "ALL";
+
+// Telemetry feed flag – stamped at image build time ("online" normally, "offline" in the faulty release).
+const TELEMETRY_FEED = "__TELEMETRY_FEED__";
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+function simulateTick() {
+  const now = new Date();
+  zones.forEach(z => {
+    z.pressure = clamp(z.basePressure + rand(-0.15, 0.15), 0.8, 6);
+    const supplying = supplyState(z, now).on;
+    z.reservoir = clamp(z.reservoir + (supplying ? rand(-0.4, 0) : rand(0, 0.3)), 5, 100);
+    z.consumptionKL = Math.round(clamp(z.consumptionKL + rand(-60, 60), z.supplyKL * 0.8, z.supplyKL * 0.99));
+  });
+  // Maintenance workflow progresses: Open -> Crew Dispatched -> Under Repair -> Resolved
+  const flow = ["Open", "Crew Dispatched", "Under Repair", "Resolved"];
+  leaks.forEach(l => { if (l.status !== "Resolved" && Math.random() < 0.04) l.status = flow[flow.indexOf(l.status) + 1]; });
+  // Occasionally a new leak is detected (abnormal night-flow / pressure drop)
+  if (Math.random() < 0.06 && leaks.length < 12) {
+    const z = zones[Math.floor(Math.random() * zones.length)];
+    const sev = ["Critical", "High", "Medium", "Low"][Math.floor(Math.random() * 4)];
+    leaks.unshift({ id: `LK-${leakSeq++}`, zoneId: z.id, location: LEAK_SITES[z.id], severity: sev,
+      lossKL: Math.round({ Critical: 350, High: 160, Medium: 60, Low: 20 }[sev] * rand(0.8, 1.2)), detected: new Date(), status: "Open" });
+  }
+}
+
+// ============================ RENDERING ============================
+const fmt = n => n.toLocaleString("en-IN");
+
+const visibleZones = () => filterByZone(zones, selectedZone);
+const zoneName = id => (zones.find(z => z.id === id) || {}).name || id;
+
+function renderKpis() {
+  const a = computeAnalytics(visibleZones());
+  document.getElementById("totalSupply").textContent = `${fmt(a.totalSupplyKL)} kL`;
+  document.getElementById("totalSupplyNote").textContent = selectedZone === "ALL" ? `across ${zones.length} zones` : zoneName(selectedZone);
+  document.getElementById("totalConsumption").textContent = `${fmt(a.totalConsumptionKL)} kL`;
+  document.getElementById("nrwNote").textContent = `Non-revenue water ≈ ${a.nonRevenuePct.toFixed(1)}%`;
+  document.getElementById("topZone").textContent = a.topZone ? a.topZone.id : "--";
+  document.getElementById("topZoneNote").textContent = a.topZone ? `${a.topZone.name} · ${fmt(a.topZone.consumptionKL)} kL/day` : "";
+  const open = filterByZone(leaks, selectedZone).filter(l => l.status !== "Resolved");
+  document.getElementById("openLeaks").textContent = open.length;
+  document.getElementById("openLeaksNote").textContent = `≈ ${fmt(open.reduce((s, l) => s + l.lossKL, 0))} kL/day estimated loss`;
+}
+
+function renderLeaks() {
+  const rows = filterByZone(leaks, selectedZone)
+    .slice().sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || b.detected - a.detected);
+  document.querySelector("#leakTable tbody").innerHTML = rows.length ? rows.map(l => `<tr>
+      <td>${l.id}</td><td>${l.zoneId}</td><td>${l.location}</td>
+      <td><span class="badge ${l.severity}">${l.severity}</span></td><td>${fmt(l.lossKL)}</td>
+      <td>${l.detected.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} ${l.detected.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
+      <td class="status-${l.status.replace(/ /g, "-")}">${l.status}</td></tr>`).join("")
+    : `<tr><td colspan="7" class="empty">No leakage incidents for this zone.</td></tr>`;
+}
+
+function renderQueue() {
+  const q = prioritizeMaintenance(filterByZone(buildAlerts(zones), selectedZone), filterByZone(leaks, selectedZone));
+  document.getElementById("maintenanceQueue").innerHTML = q.length
+    ? q.slice(0, 8).map(i => `<li class="${i.severity}"><span class="badge ${i.severity}">${i.severity}</span>
+        <div><b>${i.zoneId} · ${i.source}</b><br><span class="meta">${i.message}</span></div></li>`).join("")
+    : `<li class="empty">No pending maintenance.</li>`;
+}
+
+function renderAlerts() {
+  const alerts = filterByZone(buildAlerts(zones), selectedZone);
+  document.getElementById("alertList").innerHTML = alerts.length
+    ? alerts.map(a => `<li class="${a.severity}"><span class="badge ${a.severity}">${a.severity}</span>
+        <div><b>${a.zoneId} · ${a.zoneName}</b><br><span class="meta">${a.message}</span></div></li>`).join("")
+    : `<li class="empty">No active alerts – all zones within limits.</li>`;
+}
+
+function renderZones() {
+  document.getElementById("zoneGrid").innerHTML = visibleZones().map(z => {
+    const { status } = evaluateZone(z);
+    const pBad = z.pressure < THRESHOLDS.PRESSURE_MIN || z.pressure > THRESHOLDS.PRESSURE_MAX;
+    const rLow = z.reservoir < THRESHOLDS.RESERVOIR_MIN_PCT;
+    return `<div class="card ${status}" data-zone="${z.id}">
+      <h3>${z.id} · ${z.name}<span class="badge ${status}">${status}</span></h3>
+      <div class="sub">Reservoir capacity ${z.capacityML} ML</div>
+      <div class="row"><span>Reservoir level</span><b class="${rLow ? "bad" : ""}">${z.reservoir.toFixed(1)}%</b></div>
+      <div class="bar"><div class="${rLow ? "low" : ""}" style="width:${z.reservoir}%"></div></div>
+      <div class="row"><span>Daily supply</span><b>${fmt(z.supplyKL)} kL</b></div>
+      <div class="row"><span>Est. consumption</span><b>${fmt(z.consumptionKL)} kL</b></div>
+      <div class="row"><span>Pipeline pressure</span><b class="${pBad ? "bad" : ""}">${z.pressure.toFixed(2)} bar</b></div>
+      <div class="row"><span>Supply timings</span><b>${z.schedule.join(", ")}</b></div>
+    </div>`;
+  }).join("");
+}
+
+function renderSchedule() {
+  const now = new Date();
+  document.querySelector("#scheduleTable tbody").innerHTML = visibleZones().map(z => {
+    const s = supplyState(z, now);
+    return `<tr><td>${z.id}</td><td>${z.name}</td><td>${z.schedule.join(" &nbsp;|&nbsp; ")}</td>
+      <td><span class="badge ${s.on ? "on" : "Maintenance"}">${s.label}</span></td></tr>`;
+  }).join("");
+}
+
+function render() {
+  renderKpis();
+  renderAlerts();
+  renderZones();
+  renderLeaks();
+  renderQueue();
+  renderSchedule();
+  document.getElementById("lastUpdate").textContent = new Date().toLocaleTimeString();
+}
+
+function start() {
+  document.getElementById("pRange").textContent = `${THRESHOLDS.PRESSURE_MIN}–${THRESHOLDS.PRESSURE_MAX}`;
+  document.getElementById("rMin").textContent = THRESHOLDS.RESERVOIR_MIN_PCT;
+  const ver = document.getElementById("appVersion");
+  if (ver.textContent.startsWith("__")) ver.textContent = "local-dev";
+  if (TELEMETRY_FEED === "offline") {
+    document.getElementById("feedBanner").innerHTML =
+      `<div class="banner"><b>MONITORING FAILURE:</b> telemetry feed unavailable – zone data cannot be loaded.</div>`;
+    throw new Error("Telemetry feed offline");
+  }
+  const sel = document.getElementById("zoneFilter");
+  zones.forEach(z => sel.insertAdjacentHTML("beforeend", `<option value="${z.id}">${z.id} – ${z.name}</option>`));
+  sel.addEventListener("change", e => { selectedZone = e.target.value; render(); });
+  render();
+  setInterval(() => { simulateTick(); render(); }, 4000);
+}
+start();
+</script>
+</body>
+</html>
