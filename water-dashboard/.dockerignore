@@ -1,0 +1,6 @@
+.git
+build
+*.md
+Jenkinsfile
+deployment.yaml
+scripts

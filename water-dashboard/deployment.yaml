@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: water-dashboard
+  labels:
+    app: water-dashboard
+  annotations:
+    kubernetes.io/change-cause: "Faulty release to test rollback"
+spec:
+  replicas: 3
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 90
+  minReadySeconds: 5
+  selector:
+    matchLabels:
+      app: water-dashboard
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0        
+  template:
+    metadata:
+      labels:
+        app: water-dashboard
+        version: "v1.0.0"
+    spec:
+      containers:
+        - name: water-dashboard
+          image: __IMAGE__
+          imagePullPolicy: IfNotPresent   # tags are unique per build
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:          # a faulty release fails here -> rollout stalls -> rollback
+            httpGet:
+              path: /health.json
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: water-dashboard-svc
+  labels:
+    app: water-dashboard
+spec:
+  type: NodePort
+  selector:
+    app: water-dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30080            # http://localhost:30080 on Docker Desktop
